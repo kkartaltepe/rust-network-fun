@@ -1,0 +1,24 @@
+[package]
+name = "rust-network"
+version = "0.1.0"
+authors = ["Kurt Kartaltepe <kkartalepe@gmail.com>"]
+
+[[bin]]
+name = "server"
+path = "src/server.rs"
+
+[[bin]]
+name = "sender"
+path = "src/sender.rs"
+
+[dependencies.glfw]
+git = "https://github.com/bjz/glfw-rs.git"
+
+[dependencies.gl]
+git = "https://github.com/bjz/gl-rs"
+
+[dependencies.ode]
+git = "https://github.com/kkartaltepe/ode-rust-binding"
+
+[dependencies]
+libc = "0.1.6"
