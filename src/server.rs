@@ -4,20 +4,60 @@ extern crate gl;
 extern crate libc;
 
 mod shader_loader;
+mod vec;
 
 use std::net::UdpSocket;
 use std::thread;
 use std::mem;
 use std::ffi::CString;
-use std::ops::{Add, Sub, Neg};
 use std::f32::*;
-use glfw::{Action, Context, Key, WindowHint, OpenGlProfileHint};
+use glfw::{Action, Context, Key, WindowHint};
 use gl::types::*;
+use vec::Vec3;
 
 static VERTEX_DATA : [f32; 9] = [
     -1.0, -1.0, -1.0,
     1.0, -1.0, -1.0,
     0.0, 1.0, -1.0
+];
+
+static CUBE_VERTEX_DATA : [f32; 108] = [
+    -1.0,-1.0,-1.0, // triangle 1 : begin
+    -1.0,-1.0, 1.0,
+    -1.0, 1.0, 1.0, // triangle 1 : end
+    1.0, 1.0,-1.0, // triangle 2 : begin
+    -1.0,-1.0,-1.0,
+    -1.0, 1.0,-1.0, // triangle 2 : end
+    1.0,-1.0, 1.0,
+    -1.0,-1.0,-1.0,
+    1.0,-1.0,-1.0,
+    1.0, 1.0,-1.0,
+    1.0,-1.0,-1.0,
+    -1.0,-1.0,-1.0,
+    -1.0,-1.0,-1.0,
+    -1.0, 1.0, 1.0,
+    -1.0, 1.0,-1.0,
+    1.0,-1.0, 1.0,
+    -1.0,-1.0, 1.0,
+    -1.0,-1.0,-1.0,
+    -1.0, 1.0, 1.0,
+    -1.0,-1.0, 1.0,
+    1.0,-1.0, 1.0,
+    1.0, 1.0, 1.0,
+    1.0,-1.0,-1.0,
+    1.0, 1.0,-1.0,
+    1.0,-1.0,-1.0,
+    1.0, 1.0, 1.0,
+    1.0,-1.0, 1.0,
+    1.0, 1.0, 1.0,
+    1.0, 1.0,-1.0,
+    -1.0, 1.0,-1.0,
+    1.0, 1.0, 1.0,
+    -1.0, 1.0,-1.0,
+    -1.0, 1.0, 1.0,
+    1.0, 1.0, 1.0,
+    -1.0, 1.0, 1.0,
+    1.0,-1.0, 1.0
 ];
 
 static mut VIEW_MAT : [f32; 16] = [
@@ -34,80 +74,6 @@ static mut PROJ_MAT : [f32; 16] = [
     0.0, 0.0, 0.0, 1.0
 ];
 
-#[derive(Copy, Clone)]
-struct Vec3 {
-    pub x : f32,
-    pub y : f32,
-    pub z : f32
-}
-
-impl Add for Vec3 {
-    type Output = Vec3;
-
-    fn add(self, other: Vec3) -> Vec3 {
-     return Vec3 {
-         x: self.x + other.x,
-         y: self.y + other.y,
-         z: self.z + other.z
-     }
-    }
-}
-
-impl Neg for Vec3 {
-    type Output = Vec3;
-
-    fn neg(self) -> Vec3 {
-     return Vec3 {
-         x: -self.x,
-         y: -self.y,
-         z: -self.z
-     }
-    }
-}
-
-impl Sub for Vec3 {
-    type Output = Vec3;
-
-    fn sub(self, other: Vec3) -> Vec3 {
-     return Vec3 {
-         x: self.x - other.x,
-         y: self.y - other.y,
-         z: self.z - other.z
-     }
-    }
-}
-
-impl Vec3 {
-    fn new(x_: f32, y_: f32, z_: f32) -> Vec3 {
-        return Vec3 {
-            x: x_,
-            y: y_,
-            z: z_
-        }
-    }
-
-    fn normalize(mut self) -> Vec3 {
-        let len = self.dot(self).sqrt();
-        self.x = self.x/len;
-        self.y = self.y/len;
-        self.z = self.z/len;
-        self
-    }
-
-    fn cross(self, b : Vec3) -> Vec3 {
-        return Vec3 {
-            x: self.y*b.z - self.z*b.y,
-            y: self.z*b.x - self.x*b.z,
-            z: self.x*b.y - self.y*b.x
-        }
-    }
-
-    fn dot(self, other : Vec3) -> f32 {
-     return (self.x * other.x)
-            + (self.y * other.y)
-            + (self.z * other.z)
-    }
-}
 
 fn perspective(matrix : &mut [f32; 16], near : f32, far : f32, width : f32, height : f32) {
     let ar = width/height;
@@ -122,14 +88,14 @@ fn perspective(matrix : &mut [f32; 16], near : f32, far : f32, width : f32, heig
 }
 
 fn look_at(matrix : &mut [f32; 16], target : Vec3, eye : Vec3, up : Vec3) {
-    let L = (eye - target).normalize();
-    let S = up.cross(L).normalize();
-    let up_ = L.cross(S).normalize();
+    let l = (eye - target).normalize();
+    let s = up.cross(l).normalize();
+    let nup = l.cross(s).normalize();
     *matrix = [
-        S.x, up_.x, L.x,  0.0,
-        S.y, up_.y, L.y,  0.0,
-        S.z, up_.z, L.z,  0.0,
-        -eye.dot(S), -eye.dot(up_), -eye.dot(L), 1.0
+        s.x, nup.x, l.x,  0.0,
+        s.y, nup.y, l.y,  0.0,
+        s.z, nup.z, l.z,  0.0,
+        -eye.dot(s), -eye.dot(nup), -eye.dot(l), 1.0
     ];
 }
 
@@ -168,8 +134,8 @@ fn main() {
         gl::GenBuffers(1, &mut vertexbuffer);
         gl::BindBuffer(gl::ARRAY_BUFFER, vertexbuffer);
         gl::BufferData(gl::ARRAY_BUFFER,
-                       mem::size_of_val(&VERTEX_DATA) as i64,
-                       VERTEX_DATA.as_ptr() as *const libc::c_void,
+                       mem::size_of_val(&CUBE_VERTEX_DATA) as i64,
+                       CUBE_VERTEX_DATA.as_ptr() as *const libc::c_void,
                        gl::STATIC_DRAW);
 
         vert_shader = shader_loader::compile_shader_file("vertex.glsl", gl::VERTEX_SHADER);
@@ -216,7 +182,7 @@ fn main() {
                 std::ptr::null()
             );
 
-            gl::DrawArrays(gl::TRIANGLES, 0, 3);
+            gl::DrawArrays(gl::TRIANGLES, 0, 36);
             gl::DisableVertexAttribArray(position_loc);
         }
 
