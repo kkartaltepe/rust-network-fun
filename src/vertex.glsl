@@ -1,5 +1,6 @@
 #version 330
-layout(location = 0) in vec3 position_modelspace;
+in vec3 ms_position;
+uniform mat4 view, proj;
 void main() {
-   gl_Position = vec4(position_modelspace, 1.0);
+   gl_Position = proj * view * vec4(ms_position, 1.0);
 }
