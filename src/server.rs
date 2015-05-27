@@ -60,6 +60,45 @@ static CUBE_VERTEX_DATA : [f32; 108] = [
     1.0,-1.0, 1.0
 ];
 
+static CUBE_NORMAL_DATA : [f32; 108] = [
+    -1.0, 0.0, 0.0, // triangle 1 : begin
+    -1.0, 0.0, 0.0,
+    -1.0, 0.0, 0.0, // triangle 1 : end
+    0.0, 0.0,-1.0, // triangle 2 : begin
+    0.0, 0.0,-1.0,
+    0.0, 0.0,-1.0, // triangle 2 : end
+    0.0,-1.0, 0.0,
+    0.0,-1.0, 0.0,
+    0.0,-1.0, 0.0,
+    0.0, 0.0,-1.0,
+    0.0, 0.0,-1.0,
+    0.0, 0.0,-1.0,
+    -1.0, 0.0, 0.0,
+    -1.0, 0.0, 0.0,
+    -1.0, 0.0, 0.0,
+    0.0,-1.0, 0.0,
+    0.0,-1.0, 0.0,
+    0.0,-1.0, 0.0,
+    0.0, 0.0, 1.0,
+    0.0, 0.0, 1.0,
+    0.0, 0.0, 1.0,
+    1.0, 0.0, 0.0,
+    1.0, 0.0, 0.0,
+    1.0, 0.0, 0.0,
+    1.0, 0.0, 0.0,
+    1.0, 0.0, 0.0,
+    1.0, 0.0, 0.0,
+    0.0, 1.0, 0.0,
+    0.0, 1.0, 0.0,
+    0.0, 1.0, 0.0,
+    0.0, 1.0, 0.0,
+    0.0, 1.0, 0.0,
+    0.0, 1.0, 0.0,
+    0.0, 0.0, 1.0,
+    0.0, 0.0, 1.0,
+    0.0, 0.0, 1.0
+];
+
 static mut VIEW_MAT : [f32; 16] = [
     1.0, 0.0, 0.0, 0.0,
     0.0, 1.0, 0.0, 0.0,
@@ -124,6 +163,7 @@ fn main() {
 
     let mut vert_array_id = 0;
     let mut vertexbuffer = 0;
+    let mut normalbuffer = 0;
     let mut program_id;
     let mut vert_shader;
     let mut frag_shader;
@@ -138,6 +178,14 @@ fn main() {
                        CUBE_VERTEX_DATA.as_ptr() as *const libc::c_void,
                        gl::STATIC_DRAW);
 
+        gl::GenBuffers(1, &mut normalbuffer);
+        gl::BindBuffer(gl::ARRAY_BUFFER, normalbuffer);
+        gl::BufferData(gl::ARRAY_BUFFER,
+                       mem::size_of_val(&CUBE_NORMAL_DATA) as i64,
+                       CUBE_NORMAL_DATA.as_ptr() as *const libc::c_void,
+                       gl::STATIC_DRAW);
+
+
         vert_shader = shader_loader::compile_shader_file("vertex.glsl", gl::VERTEX_SHADER);
         frag_shader = shader_loader::compile_shader_file("frag.glsl", gl::FRAGMENT_SHADER);
         program_id = shader_loader::link_program(vert_shader, frag_shader);
@@ -146,13 +194,9 @@ fn main() {
         perspective(&mut PROJ_MAT, 0.1, 1000.0, 1.0, 1.0);
         look_at(&mut VIEW_MAT,
                 Vec3::new(0.0, 0.0, -1.0),
-                Vec3::new(4.0, 3.0, 3.0),
+                Vec3::new(4.0, 3.0, -3.0),
                 Vec3::new(0.0, 1.0, 0.0)
                 );
-
-        //for fl in PROJ_MAT.iter() {
-            //println!("{} ", fl);
-        //}
 
         let view_id = gl::GetUniformLocation(program_id, CString::new("view").unwrap().as_ptr());
         let proj_id = gl::GetUniformLocation(program_id, CString::new("proj").unwrap().as_ptr());
@@ -165,8 +209,10 @@ fn main() {
     while !window.should_close() {
         glfw.poll_events();
         unsafe { // Opengl calls are unsafe
+            gl::Enable(gl::DEPTH_TEST);
+            gl::DepthFunc(gl::LESS);
             gl::ClearColor(0.38, 0.906, 0.722, 1.0);
-            gl::Clear(gl::COLOR_BUFFER_BIT);
+            gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
 
             let position_loc = gl::GetAttribLocation(program_id,
                                                      CString::new("ms_position").unwrap().as_ptr()) as GLuint;
@@ -174,7 +220,19 @@ fn main() {
                                             // Can be programatic using GetAttribLocation
             gl::BindBuffer(gl::ARRAY_BUFFER, vertexbuffer);
             gl::VertexAttribPointer(
+                position_loc,
+                3,
+                gl::FLOAT,
+                gl::FALSE,
                 0,
+                std::ptr::null()
+            );
+            let normal_loc = gl::GetAttribLocation(program_id,
+                                                     CString::new("ms_normal").unwrap().as_ptr()) as GLuint;
+            gl::EnableVertexAttribArray(normal_loc); // Corresponds to location = X in vert_shader
+            gl::BindBuffer(gl::ARRAY_BUFFER, normalbuffer);
+            gl::VertexAttribPointer(
+                normal_loc,
                 3,
                 gl::FLOAT,
                 gl::FALSE,
@@ -184,6 +242,7 @@ fn main() {
 
             gl::DrawArrays(gl::TRIANGLES, 0, 36);
             gl::DisableVertexAttribArray(position_loc);
+            gl::DisableVertexAttribArray(normal_loc);
         }
 
         for(_, event) in glfw::flush_messages(&events) {
