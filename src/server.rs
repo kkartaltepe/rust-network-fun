@@ -169,6 +169,60 @@ extern fn near_callback(data : *mut libc::c_void, obj1 : ode::dGeomID, obj2 : od
     }
 }
 
+fn render_cube(geom: dGeomID, program_id: GLuint, vertexbuffer: GLuint, normalbuffer: GLuint) {
+    unsafe {
+    let rotMat: *const f32 = ode::dGeomGetRotation(geom);
+    let posVec: *const f32 = ode::dGeomGetPosition(geom);
+    let rustPos = std::slice::from_raw_parts(posVec, 3);
+    let rustRot = std::slice::from_raw_parts(rotMat, 16);
+    for i in 0..12 {
+        MODEL_MAT[i] = rustRot[i];
+    }
+    translate(&mut MODEL_MAT, rustPos[0], rustPos[1], rustPos[2]);
+    println!("Rot[] = [");
+    for i in 0..16 {
+        print!("{}, ", rustRot[i]);
+        if (i+1)%4 == 0 {
+            print!("\n");
+        }
+    }
+    println!("]");
+    let model_mat_id = gl::GetUniformLocation(program_id, CString::new("model").unwrap().as_ptr());
+    gl::UniformMatrix4fv(model_mat_id, 1, gl::TRUE, &MODEL_MAT[0]);
+
+    let position_loc = gl::GetAttribLocation(program_id,
+                                             CString::new("ms_position").unwrap().as_ptr()) as GLuint;
+    gl::EnableVertexAttribArray(position_loc); // Corresponds to location = X in vert_shader
+    // Can be programatic using GetAttribLocation
+    gl::BindBuffer(gl::ARRAY_BUFFER, vertexbuffer);
+    gl::VertexAttribPointer(
+        position_loc,
+        3,
+        gl::FLOAT,
+        gl::FALSE,
+        0,
+        std::ptr::null()
+        );
+    let normal_loc = gl::GetAttribLocation(program_id,
+                                           CString::new("ms_normal").unwrap().as_ptr()) as GLuint;
+    gl::EnableVertexAttribArray(normal_loc); // Corresponds to location = X in vert_shader
+    gl::BindBuffer(gl::ARRAY_BUFFER, normalbuffer);
+    gl::VertexAttribPointer(
+        normal_loc,
+        3,
+        gl::FLOAT,
+        gl::FALSE,
+        0,
+        std::ptr::null()
+        );
+
+    gl::DrawArrays(gl::TRIANGLES, 0, 36);
+    gl::DisableVertexAttribArray(position_loc);
+    gl::DisableVertexAttribArray(normal_loc);
+    }
+
+}
+
 fn main() {
     print!("Starting server . . . ");
     let mut glfw = glfw::init(glfw::FAIL_ON_ERRORS).unwrap();
@@ -205,7 +259,6 @@ fn main() {
     let mut geom;
     let mut m : ode::dMass = ode::dMass{..Default::default()};
 
-    let model_mat_id;
     let view_id;
     //Init everything
     unsafe {
@@ -233,15 +286,14 @@ fn main() {
         gl::UseProgram(program_id);
 
         perspective(&mut PROJ_MAT, 0.1, 400.0, 1.0, 1.0);
-        //look_at(&mut VIEW_MAT,
-                //Vec3::new(0.0, 0.0, -1.0),
-                //Vec3::new(4.0, 3.0, -3.0),
-                //Vec3::new(0.0, 1.0, 0.0)
-                //);
+        look_at(&mut VIEW_MAT,
+                Vec3::new(0.0, 0.0, -1.0),
+                Vec3::new(0.0, 15.0, -7.0),
+                Vec3::new(0.0, 1.0, 0.0)
+                );
 
         view_id = gl::GetUniformLocation(program_id, CString::new("view").unwrap().as_ptr());
         let proj_id = gl::GetUniformLocation(program_id, CString::new("proj").unwrap().as_ptr());
-        model_mat_id = gl::GetUniformLocation(program_id, CString::new("model").unwrap().as_ptr());
 
         gl::UniformMatrix4fv(view_id, 1, gl::FALSE, &VIEW_MAT[0]);
         gl::UniformMatrix4fv(proj_id, 1, gl::TRUE, &PROJ_MAT[0]);
@@ -272,65 +324,12 @@ fn main() {
             ode::dWorldQuickStep(world, 0.01);
             ode::dJointGroupEmpty(contact_group);
 
-            let rotMat: *const f32 = ode::dGeomGetRotation(geom);
-            let posVec: *const f32 = ode::dGeomGetPosition(geom);
-            let rustPos = std::slice::from_raw_parts(posVec, 3);
-            let rustRot = std::slice::from_raw_parts(rotMat, 16);
-            for i in 0..12 {
-                MODEL_MAT[i] = rustRot[i];
-            }
-            translate(&mut MODEL_MAT, rustPos[0], rustPos[1], rustPos[2]);
-            println!("Rot[] = [");
-            for i in 0..16 {
-                print!("{}, ", rustRot[i]);
-                if (i+1)%4 == 0 {
-                    print!("\n");
-                }
-            }
-            println!("]");
-            look_at(&mut VIEW_MAT,
-                    Vec3::new(0.0, 0.0, -1.0),
-                    //Vec3::new(rustPos[0], rustPos[1], rustPos[2]),
-                    Vec3::new(0.0, 25.0, -10.0),
-                    Vec3::new(0.0, 1.0, 0.0)
-                    );
-            gl::UniformMatrix4fv(model_mat_id, 1, gl::TRUE, &MODEL_MAT[0]);
-            gl::UniformMatrix4fv(view_id, 1, gl::FALSE, &VIEW_MAT[0]);
-
             gl::Enable(gl::DEPTH_TEST);
             gl::DepthFunc(gl::LESS);
             gl::ClearColor(0.38, 0.906, 0.722, 1.0);
             gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
 
-            let position_loc = gl::GetAttribLocation(program_id,
-                                                     CString::new("ms_position").unwrap().as_ptr()) as GLuint;
-            gl::EnableVertexAttribArray(position_loc); // Corresponds to location = X in vert_shader
-                                            // Can be programatic using GetAttribLocation
-            gl::BindBuffer(gl::ARRAY_BUFFER, vertexbuffer);
-            gl::VertexAttribPointer(
-                position_loc,
-                3,
-                gl::FLOAT,
-                gl::FALSE,
-                0,
-                std::ptr::null()
-            );
-            let normal_loc = gl::GetAttribLocation(program_id,
-                                                     CString::new("ms_normal").unwrap().as_ptr()) as GLuint;
-            gl::EnableVertexAttribArray(normal_loc); // Corresponds to location = X in vert_shader
-            gl::BindBuffer(gl::ARRAY_BUFFER, normalbuffer);
-            gl::VertexAttribPointer(
-                normal_loc,
-                3,
-                gl::FLOAT,
-                gl::FALSE,
-                0,
-                std::ptr::null()
-            );
-
-            gl::DrawArrays(gl::TRIANGLES, 0, 36);
-            gl::DisableVertexAttribArray(position_loc);
-            gl::DisableVertexAttribArray(normal_loc);
+            render_cube(geom, program_id, vertexbuffer, normalbuffer);
         }
 
         for(_, event) in glfw::flush_messages(&events) {
