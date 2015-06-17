@@ -29,42 +29,42 @@ struct WorldData {
 }
 
 static CUBE_VERTEX_DATA : [f32; 108] = [
-    -1.0,-1.0,-1.0, // triangle 1 : begin
-    -1.0,-1.0, 1.0,
-    -1.0, 1.0, 1.0, // triangle 1 : end
-    1.0, 1.0,-1.0, // triangle 2 : begin
-    -1.0,-1.0,-1.0,
-    -1.0, 1.0,-1.0, // triangle 2 : end
-    1.0,-1.0, 1.0,
-    -1.0,-1.0,-1.0,
-    1.0,-1.0,-1.0,
-    1.0, 1.0,-1.0,
-    1.0,-1.0,-1.0,
-    -1.0,-1.0,-1.0,
-    -1.0,-1.0,-1.0,
-    -1.0, 1.0, 1.0,
-    -1.0, 1.0,-1.0,
-    1.0,-1.0, 1.0,
-    -1.0,-1.0, 1.0,
-    -1.0,-1.0,-1.0,
-    -1.0, 1.0, 1.0,
-    -1.0,-1.0, 1.0,
-    1.0,-1.0, 1.0,
-    1.0, 1.0, 1.0,
-    1.0,-1.0,-1.0,
-    1.0, 1.0,-1.0,
-    1.0,-1.0,-1.0,
-    1.0, 1.0, 1.0,
-    1.0,-1.0, 1.0,
-    1.0, 1.0, 1.0,
-    1.0, 1.0,-1.0,
-    -1.0, 1.0,-1.0,
-    1.0, 1.0, 1.0,
-    -1.0, 1.0,-1.0,
-    -1.0, 1.0, 1.0,
-    1.0, 1.0, 1.0,
-    -1.0, 1.0, 1.0,
-    1.0,-1.0, 1.0
+    -0.5,-0.5,-0.5, // triangle 1 : begin
+    -0.5,-0.5, 0.5,
+    -0.5, 0.5, 0.5, // triangle 1 : end
+    0.5, 0.5,-0.5, // triangle 2 : begin
+    -0.5,-0.5,-0.5,
+    -0.5, 0.5,-0.5, // triangle 2 : end
+    0.5,-0.5, 0.5,
+    -0.5,-0.5,-0.5,
+    0.5,-0.5,-0.5,
+    0.5, 0.5,-0.5,
+    0.5,-0.5,-0.5,
+    -0.5,-0.5,-0.5,
+    -0.5,-0.5,-0.5,
+    -0.5, 0.5, 0.5,
+    -0.5, 0.5,-0.5,
+    0.5,-0.5, 0.5,
+    -0.5,-0.5, 0.5,
+    -0.5,-0.5,-0.5,
+    -0.5, 0.5, 0.5,
+    -0.5,-0.5, 0.5,
+    0.5,-0.5, 0.5,
+    0.5, 0.5, 0.5,
+    0.5,-0.5,-0.5,
+    0.5, 0.5,-0.5,
+    0.5,-0.5,-0.5,
+    0.5, 0.5, 0.5,
+    0.5,-0.5, 0.5,
+    0.5, 0.5, 0.5,
+    0.5, 0.5,-0.5,
+    -0.5, 0.5,-0.5,
+    0.5, 0.5, 0.5,
+    -0.5, 0.5,-0.5,
+    -0.5, 0.5, 0.5,
+    0.5, 0.5, 0.5,
+    -0.5, 0.5, 0.5,
+    0.5,-0.5, 0.5
 ];
 
 static CUBE_NORMAL_DATA : [f32; 108] = [
@@ -158,11 +158,11 @@ extern fn near_callback(data : *mut libc::c_void, obj1 : ode::dGeomID, obj2 : od
         let mut contact = ode::dContact{..Default::default()};
         contact.surface.mode = (ode::dContactBounce | ode::dContactSoftCFM) as i32;
         contact.surface.mu = ode::dInfinity;
-        contact.surface.bounce = 0.9;
-        contact.surface.bounce_vel = 0.1;
+        contact.surface.bounce = 0.6;
+        contact.surface.bounce_vel = 0.5;
         contact.surface.soft_cfm = 0.001;
         if ode::dCollide(obj1, obj2, 1, &mut contact.geom, std::mem::size_of::<ode::dContact>() as libc::c_int) != 0 {
-            println!("Collision detected!");
+            //println!("Collision detected!");
             let joint = ode::dJointCreateContact(world_data.world, world_data.contacts, &mut contact);
             ode::dJointAttach(joint, b1, b2);
         }
@@ -179,14 +179,14 @@ fn render_cube(geom: dGeomID, program_id: GLuint, vertexbuffer: GLuint, normalbu
         MODEL_MAT[i] = rustRot[i];
     }
     translate(&mut MODEL_MAT, rustPos[0], rustPos[1], rustPos[2]);
-    println!("Rot[] = [");
-    for i in 0..16 {
-        print!("{}, ", rustRot[i]);
-        if (i+1)%4 == 0 {
-            print!("\n");
-        }
-    }
-    println!("]");
+    //println!("Rot[] = [");
+    //for i in 0..16 {
+        //print!("{}, ", rustRot[i]);
+        //if (i+1)%4 == 0 {
+            //print!("\n");
+        //}
+    //}
+    //println!("]");
     let model_mat_id = gl::GetUniformLocation(program_id, CString::new("model").unwrap().as_ptr());
     gl::UniformMatrix4fv(model_mat_id, 1, gl::TRUE, &MODEL_MAT[0]);
 
@@ -220,7 +220,23 @@ fn render_cube(geom: dGeomID, program_id: GLuint, vertexbuffer: GLuint, normalbu
     gl::DisableVertexAttribArray(position_loc);
     gl::DisableVertexAttribArray(normal_loc);
     }
+}
 
+fn create_cube(location: Vec3, world: dWorldID, space: dSpaceID) -> (dGeomID, Box<dMass>) {
+    let body;
+    let geom;
+    let mut m: Box<ode::dMass>;
+    unsafe {
+        body = ode::dBodyCreate(world);
+        geom = dCreateBox(space, 1.0, 1.0, 1.0);
+        m = Box::new(Default::default()); // Prevent mass from being free untill its actual owner drops it.
+        ode::dMassSetBox(&mut *m, 1.0, 1.0, 1.0, 1.0);
+        ode::dBodySetMass(body, &*m);
+        ode::dGeomSetBody(geom, body);
+        ode::dBodySetPosition(body, location.x, location.y, location.z);
+    }
+
+    return (geom, m);
 }
 
 fn main() {
@@ -251,13 +267,11 @@ fn main() {
     let mut program_id;
     let mut vert_shader;
     let mut frag_shader;
-    let mut space;
-    let mut world;
-    let mut world_data;
     let mut contact_group;
-    let mut body;
-    let mut geom;
-    let mut m : ode::dMass = ode::dMass{..Default::default()};
+    let mut geoms = Vec::<(dGeomID, Box<dMass>)>::new();
+    let world_data;
+    let space;
+    let world;
 
     let view_id;
     //Init everything
@@ -288,7 +302,7 @@ fn main() {
         perspective(&mut PROJ_MAT, 0.1, 400.0, 1.0, 1.0);
         look_at(&mut VIEW_MAT,
                 Vec3::new(0.0, 0.0, -1.0),
-                Vec3::new(0.0, 15.0, -7.0),
+                Vec3::new(0.0, 3.0, -7.0),
                 Vec3::new(0.0, 1.0, 0.0)
                 );
 
@@ -307,12 +321,9 @@ fn main() {
         contact_group = ode::dJointGroupCreate(0);
         world_data = WorldData {world: world, contacts: contact_group};
 
-        body = ode::dBodyCreate(world);
-        geom = dCreateBox(space, 1.0, 1.0, 1.0);
-        ode::dMassSetSphere(&mut m, 1.0, 0.5);
-        ode::dBodySetMass(body, &m);
-        ode::dGeomSetBody(geom, body);
-        ode::dBodySetPosition(body, 0.0, 3.0, 0.0);
+        for n in 0..100 {
+            geoms.push(create_cube(Vec3::new(((n/10)*2) as f32, 0.0, ((n%10)*2) as f32), world, space));
+        }
     }
     print!("Done.\n");
 
@@ -320,7 +331,7 @@ fn main() {
     while !window.should_close() {
         glfw.poll_events();
         unsafe { // Opengl calls are unsafe
-            ode::dSpaceCollide(space, std::mem::transmute(&mut world_data), near_callback);
+            ode::dSpaceCollide(space, std::mem::transmute(&world_data), near_callback); //Implicit that this function DOESNT change world.
             ode::dWorldQuickStep(world, 0.01);
             ode::dJointGroupEmpty(contact_group);
 
@@ -329,7 +340,11 @@ fn main() {
             gl::ClearColor(0.38, 0.906, 0.722, 1.0);
             gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
 
-            render_cube(geom, program_id, vertexbuffer, normalbuffer);
+            for geom_data in geoms.iter() {
+                render_cube(geom_data.0, program_id, vertexbuffer, normalbuffer);
+            }
+            //render_cube(geom_mass.0, program_id, vertexbuffer, normalbuffer);
+            //render_cube(geom_mass2.0, program_id, vertexbuffer, normalbuffer);
         }
 
         for(_, event) in glfw::flush_messages(&events) {
