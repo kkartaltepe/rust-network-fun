@@ -116,19 +116,33 @@ fn look_at(matrix : &mut [f32; 16], target : Vec3, eye : Vec3, up : Vec3) {
     let l = (eye - target).normalize();
     let s = up.cross(l).normalize();
     let nup = l.cross(s).normalize();
+    //*matrix = [
+        //s.x, nup.x, l.x,  0.0,
+        //s.y, nup.y, l.y,  0.0,
+        //s.z, nup.z, l.z,  0.0,
+        //-eye.dot(s), -eye.dot(nup), -eye.dot(l), 1.0
+    //];
     *matrix = [
-        s.x, nup.x, l.x,  0.0,
-        s.y, nup.y, l.y,  0.0,
-        s.z, nup.z, l.z,  0.0,
-        -eye.dot(s), -eye.dot(nup), -eye.dot(l), 1.0
+        s.x, s.y, s.z,  -eye.dot(s),
+        nup.x, nup.y, nup.z,  -eye.dot(nup),
+        l.x, l.y, l.z,  -eye.dot(l),
+        0.0, 0.0, 0.0, 1.0
     ];
 }
 
-fn translate(matrix: &mut [f32; 16], x: f32, y: f32, z: f32) {
-    (*matrix)[3] += z;
-    (*matrix)[7] += y;
-    (*matrix)[11] += x;
+//Valid for ROW MAJOR matrices
+fn rtranslate(m: &mut [f32; 16], x: f32, y: f32, z: f32) {
+    (*m)[3] += (*m)[0]*x+(*m)[1]*y+(*m)[2]*z;
+    (*m)[7] += (*m)[4]*x+(*m)[5]*y+(*m)[6]*z;
+    (*m)[11] += (*m)[8]*x+(*m)[9]*y+(*m)[10]*z;
 }
+
+fn ltranslate(m: &mut [f32; 16], x: f32, y: f32, z: f32) {
+    (*m)[3] += x;
+    (*m)[7] += y;
+    (*m)[11] += z;
+}
+
 
 
 
@@ -181,15 +195,17 @@ impl Renderer {
 
             perspective(&mut ret.proj_mat, 0.1, 400.0, 1.0, 1.0);
             look_at(&mut ret.view_mat,
-                    Vec3::new(0.0, 0.0, -1.0),
-                    Vec3::new(0.0, 3.0, -7.0),
+                    Vec3::new(10.0, 0.0, 10.0),
+                    Vec3::new(10.0, 2.0, -10.0),
                     Vec3::new(0.0, 1.0, 0.0)
                     );
 
             let view_id = gl::GetUniformLocation(ret.program_id, CString::new("view").unwrap().as_ptr());
             let proj_id = gl::GetUniformLocation(ret.program_id, CString::new("proj").unwrap().as_ptr());
 
-            gl::UniformMatrix4fv(view_id, 1, gl::FALSE, &ret.view_mat[0]);
+            //Take the transpose of ALL matrices before feeding them to opengl because I am working
+            //with ROW MAJOR matrices.
+            gl::UniformMatrix4fv(view_id, 1, gl::TRUE, &ret.view_mat[0]);
             gl::UniformMatrix4fv(proj_id, 1, gl::TRUE, &ret.proj_mat[0]);
 
             gl::GenVertexArrays(1, &mut ret.vert_array_id);
@@ -227,14 +243,15 @@ impl Renderer {
 
     pub fn render_cube(&mut self, geom: dGeomID) {
         unsafe {
-            let rot_mat: *const f32 = ode::dGeomGetRotation(geom);
-            let pos_vec: *const f32 = ode::dGeomGetPosition(geom);
-            let rust_pos = std::slice::from_raw_parts(pos_vec, 3);
-            let rust_rot = std::slice::from_raw_parts(rot_mat, 16);
-            for i in 0..12 {
-                self.model_mat[i] = rust_rot[i];
+            let pos = std::slice::from_raw_parts(ode::dGeomGetPosition(geom), 3);
+            let rot = std::slice::from_raw_parts(ode::dGeomGetRotation(geom), 12); // 3 rows, 4 columns.
+            self.model_mat = IDENT_MAT;
+            for i in 0..3 {
+                self.model_mat[i*4] = rot[i*4];
+                self.model_mat[i*4+1] = rot[i*4+1];
+                self.model_mat[i*4+2] = rot[i*4+2];
             }
-            translate(&mut self.model_mat, rust_pos[0], rust_pos[1], rust_pos[2]);
+            ltranslate(&mut self.model_mat, pos[0], pos[1], pos[2]);
             let model_mat_id = gl::GetUniformLocation(self.program_id, CString::new("model").unwrap().as_ptr());
             gl::UniformMatrix4fv(model_mat_id, 1, gl::TRUE, &self.model_mat[0]);
 

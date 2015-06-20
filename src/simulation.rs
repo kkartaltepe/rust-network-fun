@@ -66,7 +66,7 @@ impl Simulation {
         }
     }
 
-    pub fn create_cube(&mut self, location: Vec3) {
+    pub fn create_cube(&mut self, mass: f32, location: Vec3) {
         let body;
         let geom;
         let mut m: Box<ode::dMass>;
@@ -74,13 +74,20 @@ impl Simulation {
             body = ode::dBodyCreate(self.world);
             geom = dCreateBox(self.space, 1.0, 1.0, 1.0);
             m = Box::new(Default::default()); // Prevent mass from being free untill its actual owner drops it.
-            ode::dMassSetBox(&mut *m, 1.0, 1.0, 1.0, 1.0);
+            ode::dMassSetBox(&mut *m, mass, 1.0, 1.0, 1.0);
             ode::dBodySetMass(body, &*m);
             ode::dGeomSetBody(geom, body);
             ode::dBodySetPosition(body, location.x, location.y, location.z);
         }
 
         self.geoms.push((geom, m));
+    }
+
+    pub fn apply_force(&self, geom: dGeomID, force: Vec3) {
+        unsafe {
+        let body = ode::dGeomGetBody(geom);
+        ode::dBodyAddForce(body, force.x, force.y, force.z);
+        }
     }
 
     pub fn clean_up(&mut self) {

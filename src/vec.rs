@@ -76,3 +76,17 @@ impl Vec3 {
             + (self.z * other.z)
     }
 }
+
+// Opengl uses Column Major matrices.
+// ODE uses row major matrices (Because I use column vec on right)
+pub fn mmm(left: [f32; 16], right: [f32; 16]) -> [f32; 16] {
+    let mut out = [0f32; 16];
+    for i in 0..4 { // Row
+        for j in 0..4 {
+            for k in 0..4 {
+                out[i*4+j] += left[i*4+k]*right[k*4+j]
+            }
+        }
+    }
+    return out;
+}

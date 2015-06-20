@@ -39,8 +39,9 @@ fn main() {
     let mut graphix = Renderer::init();
     let mut simulation = Simulation::init();
 
+    simulation.create_cube(10.0, Vec3::new(0.0, 1.0, 0.0));
     for n in 0..100 {
-        simulation.create_cube(Vec3::new(((n/10)*2) as f32, 3.0, ((n%10)*2) as f32));
+        simulation.create_cube(1.0, Vec3::new(((n/10)*2) as f32, 3.0, ((n%10)*2) as f32));
     }
     print!("Done.\n");
 
@@ -62,7 +63,7 @@ fn main() {
         }
 
         for(_, event) in glfw::flush_messages(&graphix.events) {
-            handle_window_event(&mut graphix.window, event);
+            handle_window_event(event, &mut graphix.window, &simulation);
         }
 
         graphix.window.swap_buffers();
@@ -73,10 +74,23 @@ fn main() {
     simulation.clean_up();
 }
 
-fn handle_window_event(window: &mut glfw::Window, event: glfw::WindowEvent) {
+fn handle_window_event(event: glfw::WindowEvent, window: &mut glfw::Window, simulation: &Simulation ) {
+    let push_force = 500f32;
     match event {
         glfw::WindowEvent::Key(Key::Q, _, Action::Press, _) => {
-            window.set_should_close(true)
+            window.set_should_close(true);
+        }
+        glfw::WindowEvent::Key(Key::Up, _, _, _) => {
+            simulation.apply_force(simulation.geoms[0].0, Vec3::new(0.0, 0.0, push_force));
+        }
+        glfw::WindowEvent::Key(Key::Down, _, _, _) => {
+            simulation.apply_force(simulation.geoms[0].0, Vec3::new(0.0, 0.0, -push_force));
+        }
+        glfw::WindowEvent::Key(Key::Left, _, _, _) => {
+            simulation.apply_force(simulation.geoms[0].0, Vec3::new(push_force, 0.0, 0.0));
+        }
+        glfw::WindowEvent::Key(Key::Right, _, _, _) => {
+            simulation.apply_force(simulation.geoms[0].0, Vec3::new(-push_force, 0.0, 0.0));
         }
         _ => ()
     }
