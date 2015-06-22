@@ -1,9 +1,13 @@
 extern crate ode;
 extern crate libc;
+extern crate byteorder;
 
 use std;
 use ode::*;
 use vec::Vec3;
+
+use std::io::Cursor;
+use byteorder::{LittleEndian, WriteBytesExt, ReadBytesExt};
 
 
 
@@ -31,6 +35,7 @@ pub struct Simulation {
     space: dSpaceID,
     contact_group: dJointGroupID,
     pub geoms: Vec<(dGeomID, Box<dMass>)>,
+    paused: bool,
 }
 
 impl Simulation {
@@ -53,12 +58,16 @@ impl Simulation {
             world: world,
             space: space,
             contact_group: contact_group,
-            geoms: Vec::new()
+            geoms: Vec::new(),
+            paused: true,
         };
     }
 
 
     pub fn step(&mut self) {
+        if self.paused {
+            return
+        }
         unsafe {
         ode::dSpaceCollide(self.space, std::mem::transmute(&mut (self.world, self.contact_group)), near_callback); //Implicit that this function DOESNT change world.
         ode::dWorldQuickStep(self.world, 0.01);
@@ -98,5 +107,65 @@ impl Simulation {
         ode::dCloseODE();
         }
     }
+
+    pub fn serialize(&self) -> Vec<u8> {
+        let mut buf = vec![];
+        buf.write_u8(self.paused as u8).unwrap();
+        // Only send position rotation data if the simulation is unpaused and this data is changing.
+        // TODO: Keep dirty bit or something to know if positions have changed since last call.
+        // This will allow us to do this without checking paused and do it on a per object basis.
+        if !self.paused {
+            buf.write_u32::<LittleEndian>(self.geoms.len() as u32).unwrap();
+            for &(geom, _) in self.geoms.iter() {
+                let pos;
+                let rot;
+                unsafe {
+                pos = std::slice::from_raw_parts(ode::dGeomGetPosition(geom), 3);
+                rot = std::slice::from_raw_parts(ode::dGeomGetRotation(geom), 12); // 3 rows, 4 columns.
+                }
+                for p in 0..3 {
+                    buf.write_f32::<LittleEndian>(pos[p]).unwrap();
+                }
+                for r in 0..12 {
+                    buf.write_f32::<LittleEndian>(rot[r]).unwrap();
+                }
+            }
+        }
+        println!("Serialized state into {} bytes", buf.len());
+        return buf;
+    }
+
+    pub fn deserialize(&mut self, buf: &[u8]) {
+        let mut input = Cursor::new(buf);
+        let is_paused = input.read_u8().unwrap();
+        self.paused = is_paused == 1u8;
+
+        if !self.paused {
+            let num_geoms = input.read_u32::<LittleEndian>().unwrap() as usize;
+            for i in 0..num_geoms{
+                let mut pos = [0f32; 3];
+                let mut rot = [0f32; 12];
+                for p in 0..3 {
+                    pos[p] = input.read_f32::<LittleEndian>().unwrap();
+                }
+                for r in 0..12 {
+                    rot[r] = input.read_f32::<LittleEndian>().unwrap();
+                }
+                if i == self.geoms.len() {
+                    self.create_cube(1.0, Vec3::new(pos[0], pos[1], pos[2]));
+                } else {
+                    unsafe { dGeomSetPosition(self.geoms[i].0, pos[0], pos[1], pos[2]); }
+                }
+                unsafe {
+                    dGeomSetRotation(self.geoms[i].0, rot);
+                }
+            }
+        }
+    }
+
+    pub fn toggle_pause(&mut self) {
+        self.paused = !self.paused;
+    }
+
 
 }

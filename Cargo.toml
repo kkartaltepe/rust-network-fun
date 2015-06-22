@@ -8,8 +8,8 @@ name = "server"
 path = "src/server.rs"
 
 [[bin]]
-name = "sender"
-path = "src/sender.rs"
+name = "client"
+path = "src/client.rs"
 
 [dependencies.glfw]
 git = "https://github.com/bjz/glfw-rs.git"
@@ -22,3 +22,4 @@ git = "https://github.com/kkartaltepe/ode-rust-binding"
 
 [dependencies]
 libc = "0.1.6"
+byteorder = "0.3.10"

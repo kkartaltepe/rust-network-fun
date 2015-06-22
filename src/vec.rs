@@ -79,6 +79,7 @@ impl Vec3 {
 
 // Opengl uses Column Major matrices.
 // ODE uses row major matrices (Because I use column vec on right)
+#[allow(dead_code)]
 pub fn mmm(left: [f32; 16], right: [f32; 16]) -> [f32; 16] {
     let mut out = [0f32; 16];
     for i in 0..4 { // Row
