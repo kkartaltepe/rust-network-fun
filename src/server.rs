@@ -4,6 +4,7 @@ extern crate gl;
 extern crate libc;
 extern crate ode;
 extern crate byteorder;
+extern crate time;
 
 mod shader_loader;
 mod renderer;
@@ -15,6 +16,7 @@ use glfw::{Action, Context, Key};
 use vec::Vec3;
 use renderer::Renderer;
 use simulation::Simulation;
+use time::{Duration, PreciseTime};
 
 //static VERTEX_DATA : [f32; 9] = [
     //-1.0, -1.0, -1.0,
@@ -42,10 +44,20 @@ fn main() {
 
     // Do Simulation and rendering
     println!("Beginning simulation");
+    let mut bytes_sent = 0u64;
+    let mut last_second = PreciseTime::now();
     while !graphix.window.should_close() {
+        bytes_sent += socket.send_to(&simulation.serialize(), client).unwrap() as u64;
+        let now = PreciseTime::now();
+        let differential = last_second.to(now);
+        if differential > Duration::seconds(1) {
+            println!("Sent {} bytes in {} second.", bytes_sent, differential);
+            bytes_sent = 0;
+            last_second = now;
+        }
+
         graphix.window.glfw.poll_events();
         unsafe { // Opengl calls are unsafe
-            let _ = socket.send_to(&simulation.serialize(), client);
             simulation.step();
 
             gl::Enable(gl::DEPTH_TEST);
