@@ -1,4 +1,3 @@
-#![feature(convert)]
 extern crate glfw;
 extern crate gl;
 extern crate libc;
@@ -23,6 +22,20 @@ use time::{Duration, PreciseTime};
     //1.0, -1.0, -1.0,
     //0.0, 1.0, -1.0
 //];
+
+fn format_bytes(bytes: u64) -> String {
+    let suffixes = [ "B", "KB", "MB", "GB" ];
+    let multiplier = [ 1024u64, 1024, 1024 ];
+    let mut suffix = 0;
+    let mut sigdig = bytes;
+
+    while sigdig > 10 * multiplier[suffix] &&
+          suffix < multiplier.len() {
+        sigdig /= multiplier[suffix];
+        suffix += 1;
+    }
+    return format!("{}{}", sigdig, suffixes[suffix]);
+}
 
 fn main() {
     print!("Starting server . . . ");
@@ -51,7 +64,7 @@ fn main() {
         let now = PreciseTime::now();
         let differential = last_second.to(now);
         if differential > Duration::seconds(1) {
-            println!("Sent {} bytes in {} second.", bytes_sent, differential);
+            println!("Sent {} in {} second.", format_bytes(bytes_sent), differential);
             bytes_sent = 0;
             last_second = now;
         }

@@ -32,7 +32,7 @@ pub fn compile_shader(src: &str, ty: GLenum) -> GLuint {
             let mut buf = Vec::with_capacity(len as usize);
             buf.set_len((len as usize) - 1); // subtract 1 to skip the trailing null character
             gl::GetShaderInfoLog(shader, len, ptr::null_mut(), buf.as_mut_ptr() as *mut GLchar);
-            panic!("{}", str::from_utf8(buf.as_slice()).ok().expect("ShaderInfoLog not valid utf8"));
+            panic!("{}", str::from_utf8(&buf).ok().expect("ShaderInfoLog not valid utf8"));
         }
     }
     return shader
@@ -65,7 +65,7 @@ pub fn link_program(vs: GLuint, fs: GLuint) -> GLuint {
             let mut buf = Vec::with_capacity(len as usize);
             buf.set_len((len as usize) - 1); // subtract 1 to skip the trailing null character
             gl::GetProgramInfoLog(program, len, ptr::null_mut(), buf.as_mut_ptr() as *mut GLchar);
-            panic!("{}", str::from_utf8(buf.as_slice()).ok().expect("ProgramInfoLog not valid utf8"));
+            panic!("{}", str::from_utf8(&buf).ok().expect("ProgramInfoLog not valid utf8"));
         }
     }
     return program

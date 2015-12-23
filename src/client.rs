@@ -1,4 +1,3 @@
-#![feature(convert)]
 extern crate glfw;
 extern crate gl;
 extern crate libc;

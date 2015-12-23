@@ -174,7 +174,7 @@ impl Renderer {
             window.make_current();
 
             //Loads all GL functions
-            gl::load_with(|s| window.get_proc_address(s));
+            gl::load_with(|s| window.get_proc_address(s) as *const _);
 
             ret = Renderer{
                 window: window,
@@ -214,15 +214,15 @@ impl Renderer {
             gl::GenBuffers(1, &mut ret.vertexbuffer);
             gl::BindBuffer(gl::ARRAY_BUFFER, ret.vertexbuffer);
             gl::BufferData(gl::ARRAY_BUFFER,
-                           mem::size_of_val(&CUBE_VERTEX_DATA) as i64,
-                           CUBE_VERTEX_DATA.as_ptr() as *const libc::c_void,
+                           mem::size_of_val(&CUBE_VERTEX_DATA) as isize,
+                           CUBE_VERTEX_DATA.as_ptr() as *const _,
                            gl::STATIC_DRAW);
 
             gl::GenBuffers(1, &mut ret.normalbuffer);
             gl::BindBuffer(gl::ARRAY_BUFFER, ret.normalbuffer);
             gl::BufferData(gl::ARRAY_BUFFER,
-                           mem::size_of_val(&CUBE_NORMAL_DATA) as i64,
-                           CUBE_NORMAL_DATA.as_ptr() as *const libc::c_void,
+                           mem::size_of_val(&CUBE_NORMAL_DATA) as isize,
+                           CUBE_NORMAL_DATA.as_ptr() as *const _,
                            gl::STATIC_DRAW);
         }
 
