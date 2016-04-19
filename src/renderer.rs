@@ -1,5 +1,7 @@
-extern crate glfw;
+#![allow(dead_code)]
+
 extern crate gl;
+extern crate glutin;
 extern crate libc;
 extern crate ode;
 
@@ -7,10 +9,9 @@ use shader_loader;
 
 use std::mem;
 use std::ffi::CString;
-use std::sync::mpsc::Receiver;
 use std::f32::*;
 use std;
-use glfw::{Context, WindowHint};
+// use glfw::{Context, WindowHint};
 use gl::types::*;
 use vec::Vec3;
 use ode::*;
@@ -148,8 +149,7 @@ fn ltranslate(m: &mut [f32; 16], x: f32, y: f32, z: f32) {
 
 
 pub struct Renderer {
-    pub window: glfw::Window,
-    pub events: Receiver<(f64, glfw::WindowEvent)>,
+    pub window: glutin::Window,
     shaders: Vec<GLuint>,
     program_id: GLuint,
     model_mat: [f32; 16],
@@ -162,23 +162,32 @@ pub struct Renderer {
 
 
 impl Renderer {
-    pub fn init() -> Renderer{
+    pub fn init(win_name: &str) -> Renderer{
         let mut ret;
         unsafe {
-            let mut glfw = glfw::init(glfw::FAIL_ON_ERRORS).unwrap();
-            glfw.window_hint(WindowHint::ContextVersion(3, 2));
-            let (mut window, events) = glfw.create_window(600, 600, "Server Window", glfw::WindowMode::Windowed)
-                .expect("Failed to create GLFW window.");
+            //let mut glfw = glfw::init(glfw::FAIL_ON_ERRORS).unwrap();
+            //glfw.window_hint(WindowHint::ContextVersion(3, 2));
+            //let (mut window, events) = glfw.create_window(600, 600, win_name, glfw::WindowMode::Windowed)
+                //.expect("Failed to create GLFW window.");
 
-            window.set_key_polling(true);
-            window.make_current();
+            // window.set_key_polling(true);
+            // window.make_current();
+
+            let window = glutin::WindowBuilder::new()
+                                    .with_title(win_name.to_string())
+                                    .with_gl(glutin::GlRequest::Specific(glutin::Api::OpenGl, (3,3)))
+                                    .with_vsync()
+                                    .build()
+                                    .unwrap();
+
+            // It is essential to make the context current before calling `gl::load_with`.
+            window.make_current().unwrap();
 
             //Loads all GL functions
             gl::load_with(|s| window.get_proc_address(s) as *const _);
 
             ret = Renderer{
                 window: window,
-                events: events,
                 shaders: Vec::new(),
                 program_id: 0,
                 model_mat: IDENT_MAT,

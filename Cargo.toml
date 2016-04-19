@@ -11,16 +11,19 @@ path = "src/server.rs"
 name = "client"
 path = "src/client.rs"
 
-[dependencies.glfw]
-git = "https://github.com/bjz/glfw-rs.git"
+# [dependencies.glfw]
+# git = "https://github.com/bjz/glfw-rs.git"
+# default-features = false
 
 [dependencies.gl]
 git = "https://github.com/bjz/gl-rs"
 
 [dependencies.ode]
-git = "https://github.com/kkartaltepe/ode-rust-binding"
+path = "../ode-rust-binding"
+# git = "https://github.com/kkartaltepe/ode-rust-binding"
 
 [dependencies]
-libc = "0.1.6"
-byteorder = "0.3.10"
+libc = "0.2"
+byteorder = "0.5"
 time = "0.1"
+glutin = "*"

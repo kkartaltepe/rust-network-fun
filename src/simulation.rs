@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 extern crate ode;
 extern crate libc;
 extern crate byteorder;
@@ -25,6 +27,15 @@ extern fn near_callback(data : *mut libc::c_void, obj1 : ode::dGeomID, obj2 : od
             ode::dJointAttach(joint, b1, b2);
         }
     }
+}
+
+fn fmt_3(e: [f32; 3]) -> String {
+    format!("({},{},{})", e[0], e[1], e[2])
+}
+
+fn fmt_12(e: [f32; 12]) -> String {
+    format!("({},{},{}),({},{},{}),({},{},{}),({},{},{})",
+            e[0], e[1], e[2], e[3], e[4], e[5], e[6], e[7], e[8], e[9], e[10], e[11])
 }
 
 pub struct Simulation {
@@ -126,12 +137,14 @@ impl Simulation {
                     //print = false;
                 //}
                 }
-                if(vel[0].abs() <= 0.03f32 &&
-                   vel[1].abs() <= 0.03f32 &&
-                   vel[2].abs() <= 0.03f32 ) {
+                if vel[0].abs() <= 0.1f32 &&
+                   vel[1].abs() <= 0.1f32 &&
+                   vel[2].abs() <= 0.1f32  {
                     buf.write_u8(0).unwrap(); // Cube at rest, probably fine to not send.
                 } else {
                     buf.write_u8(1).unwrap(); // Cube in motion more data to follow.
+                    // As per the previous check, these have to be normalized floats, so their
+                    // exponent will never be negative causing the 8 bit check in decoding to work.
                     for p in 0..3 {
                         buf.write_f32::<LittleEndian>(pos[p]).unwrap();
                     }
@@ -154,7 +167,11 @@ impl Simulation {
             let num_geoms = input.read_u32::<LittleEndian>().unwrap() as usize;
             for i in 0..num_geoms{
                 if input.read_u8().unwrap() == 0 {
+                    // if i == self.geoms.len() {
+                    //     self.create_cube(1.0, Vec3::new(0f32, 0f32, 0f32));
+                    // }
                     continue; //This cube has no velocity and no data for it follows.
+                    // We assume that we will never send denormalized floats across.
                 }
 
                 let mut pos = [0f32; 3];
@@ -165,16 +182,20 @@ impl Simulation {
                 for r in 0..12 {
                     rot[r] = input.read_f32::<LittleEndian>().unwrap();
                 }
+
                 if i == self.geoms.len() {
                     self.create_cube(1.0, Vec3::new(pos[0], pos[1], pos[2]));
                 } else {
+                    // println!("Positioning cube {} at {}", i, fmt_3(pos));
                     unsafe { dGeomSetPosition(self.geoms[i].0, pos[0], pos[1], pos[2]); }
                 }
                 unsafe {
-                    dGeomSetRotation(self.geoms[i].0, rot);
+                    // println!("rotating cube {} to {}", i, fmt_12(rot));
+                    dGeomSetRotation(self.geoms[i].0, &rot);
                 }
             }
         }
+        println!("Number of geoms={}", self.geoms.len());
     }
 
     pub fn toggle_pause(&mut self) {

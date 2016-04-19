@@ -1,5 +1,6 @@
-extern crate glfw;
+//extern crate glfw;
 extern crate gl;
+extern crate glutin;
 extern crate libc;
 extern crate ode;
 extern crate byteorder;
@@ -11,7 +12,6 @@ mod simulation;
 mod vec;
 
 use std::net::UdpSocket;
-use glfw::{Action, Context, Key};
 use vec::Vec3;
 use renderer::Renderer;
 use simulation::Simulation;
@@ -40,13 +40,13 @@ fn format_bytes(bytes: u64) -> String {
 fn main() {
     print!("Starting server . . . ");
     let socket = UdpSocket::bind("127.0.0.1:35555").unwrap();
-    let mut buf = [0; 100];
+    let mut buf = [0; 9000];
     println!("Waiting on client.");
     let (_, client) = socket.recv_from(&mut buf).unwrap(); //Receive into the buffer
     println!("Client connected from {}.", client);
 
     //Init everything
-    let mut graphix = Renderer::init();
+    let mut graphix = Renderer::init("Server Window");
     let mut simulation = Simulation::init();
 
     simulation.create_cube(10.0, Vec3::new(0.0, 1.0, 0.0));
@@ -59,7 +59,8 @@ fn main() {
     println!("Beginning simulation");
     let mut bytes_sent = 0u64;
     let mut last_second = PreciseTime::now();
-    while !graphix.window.should_close() {
+    let mut should_close = false;
+    while !should_close {
         bytes_sent += socket.send_to(&simulation.serialize(), client).unwrap() as u64;
         let now = PreciseTime::now();
         let differential = last_second.to(now);
@@ -69,7 +70,6 @@ fn main() {
             last_second = now;
         }
 
-        graphix.window.glfw.poll_events();
         unsafe { // Opengl calls are unsafe
             simulation.step();
 
@@ -83,11 +83,11 @@ fn main() {
             }
         }
 
-        for(_, event) in glfw::flush_messages(&graphix.events) {
-            handle_window_event(event, &mut graphix.window, &mut simulation);
+        for event in graphix.window.poll_events() {
+            handle_window_event(event, &mut simulation, &mut should_close)
         }
 
-        graphix.window.swap_buffers();
+        graphix.window.swap_buffers().unwrap();
     }
 
     //Do clean ups
@@ -95,25 +95,29 @@ fn main() {
     simulation.clean_up();
 }
 
-fn handle_window_event(event: glfw::WindowEvent, window: &mut glfw::Window, simulation: &mut Simulation ) {
+fn handle_window_event(event: glutin::Event, simulation: &mut Simulation, should_close: &mut bool ) {
+    use glutin::Event;
+    use glutin::ElementState as KeyState;
+    use glutin::VirtualKeyCode as Key;
+
     let push_force = 500f32;
     match event {
-        glfw::WindowEvent::Key(Key::Q, _, Action::Press, _) => {
-            window.set_should_close(true);
+        Event::KeyboardInput(KeyState::Pressed, _, Some(Key::Q)) => {
+            *should_close = true;
         }
-        glfw::WindowEvent::Key(Key::P, _, Action::Press, _) => {
+        Event::KeyboardInput(KeyState::Pressed, _, Some(Key::P)) => {
             simulation.toggle_pause();
         }
-        glfw::WindowEvent::Key(Key::Up, _, _, _) => {
+        Event::KeyboardInput(KeyState::Pressed, _, Some(Key::Up)) => {
             simulation.apply_force(simulation.geoms[0].0, Vec3::new(0.0, 0.0, push_force));
         }
-        glfw::WindowEvent::Key(Key::Down, _, _, _) => {
+        Event::KeyboardInput(KeyState::Pressed, _, Some(Key::Down)) => {
             simulation.apply_force(simulation.geoms[0].0, Vec3::new(0.0, 0.0, -push_force));
         }
-        glfw::WindowEvent::Key(Key::Left, _, _, _) => {
+        Event::KeyboardInput(KeyState::Pressed, _, Some(Key::Left)) => {
             simulation.apply_force(simulation.geoms[0].0, Vec3::new(push_force, 0.0, 0.0));
         }
-        glfw::WindowEvent::Key(Key::Right, _, _, _) => {
+        Event::KeyboardInput(KeyState::Pressed, _, Some(Key::Right)) => {
             simulation.apply_force(simulation.geoms[0].0, Vec3::new(-push_force, 0.0, 0.0));
         }
         _ => ()
