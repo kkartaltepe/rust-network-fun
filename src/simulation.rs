@@ -56,7 +56,7 @@ impl Simulation {
         ode::dInitODE();
         world = ode::dWorldCreate();
         space = ode::dHashSpaceCreate(std::ptr::null_mut());
-        ode::dWorldSetGravity(world, 0.0, -4.0, 0.0);
+        ode::dWorldSetGravity(world, 0.0, -10.0, 0.0);
         ode::dWorldSetCFM(world, 0.0001);
         ode::dCreatePlane(space, 0.0, 1.0, 0.0, 0.0);
         contact_group = ode::dJointGroupCreate(0);
@@ -98,12 +98,21 @@ impl Simulation {
         }
 
         self.geoms.push((geom, m));
+        println!("Created cube #{}", self.geoms.len());
     }
 
     pub fn apply_force(&self, geom: dGeomID, force: Vec3) {
         unsafe {
         let body = ode::dGeomGetBody(geom);
         ode::dBodyAddForce(body, force.x, force.y, force.z);
+        }
+    }
+
+    pub fn get_location(&self, geom: dGeomID) -> Vec3 {
+        unsafe {
+        let ppos = ode::dGeomGetPosition(geom);
+        let vec = std::slice::from_raw_parts(ppos, 3);
+        return Vec3 { x: vec[0], y: vec[1], z: vec[2] }
         }
     }
 
@@ -117,13 +126,14 @@ impl Simulation {
     }
 
     //TODO: Move everything to quaternions
-    pub fn serialize(&self) -> Vec<u8> {
+    pub fn serialize(&self, init: bool) -> Vec<u8> {
         let mut buf = vec![];
         buf.write_u8(self.paused as u8).unwrap();
-        if !self.paused {
+        buf.write_u8(init as u8).unwrap();
+        if !self.paused || init {
             buf.write_u32::<LittleEndian>(self.geoms.len() as u32).unwrap();
             //let mut print = true;
-            for &(geom, _) in self.geoms.iter() {
+            for &(geom, ref m) in self.geoms.iter() {
                 let pos;
                 let rot;
                 let vel;
@@ -139,17 +149,19 @@ impl Simulation {
                 }
                 if vel[0].abs() <= 0.1f32 &&
                    vel[1].abs() <= 0.1f32 &&
-                   vel[2].abs() <= 0.1f32  {
+                   vel[2].abs() <= 0.1f32 &&
+                   !init {
                     buf.write_u8(0).unwrap(); // Cube at rest, probably fine to not send.
                 } else {
                     buf.write_u8(1).unwrap(); // Cube in motion more data to follow.
-                    // As per the previous check, these have to be normalized floats, so their
-                    // exponent will never be negative causing the 8 bit check in decoding to work.
                     for p in 0..3 {
                         buf.write_f32::<LittleEndian>(pos[p]).unwrap();
                     }
                     for r in 0..12 {
                         buf.write_f32::<LittleEndian>(rot[r]).unwrap();
+                    }
+                    if init { // If we are sending an initalization packet contain some extra info.
+                        buf.write_f32::<LittleEndian>(m.mass).unwrap();
                     }
                 }
             }
@@ -160,18 +172,17 @@ impl Simulation {
 
     pub fn deserialize(&mut self, buf: &[u8]) {
         let mut input = Cursor::new(buf);
-        let is_paused = input.read_u8().unwrap();
-        self.paused = is_paused == 1u8;
+        let is_paused = input.read_u8().unwrap() != 0u8;
+        let is_init = input.read_u8().unwrap() != 0u8;
 
-        if !self.paused {
+        self.paused = is_paused;
+        if !self.paused || is_init {
             let num_geoms = input.read_u32::<LittleEndian>().unwrap() as usize;
+            //println!("Decoding {} geoms",num_geoms);
             for i in 0..num_geoms{
                 if input.read_u8().unwrap() == 0 {
-                    // if i == self.geoms.len() {
-                    //     self.create_cube(1.0, Vec3::new(0f32, 0f32, 0f32));
-                    // }
-                    continue; //This cube has no velocity and no data for it follows.
-                    // We assume that we will never send denormalized floats across.
+                    continue; //This cube has no velocity and it is not an init frame
+                              // so no data for it follows.
                 }
 
                 let mut pos = [0f32; 3];
@@ -182,20 +193,19 @@ impl Simulation {
                 for r in 0..12 {
                     rot[r] = input.read_f32::<LittleEndian>().unwrap();
                 }
-
+                let mut mass = 1.0;
+                if is_init {
+                    mass = input.read_f32::<LittleEndian>().unwrap();
+                }
                 if i == self.geoms.len() {
-                    self.create_cube(1.0, Vec3::new(pos[0], pos[1], pos[2]));
-                } else {
-                    // println!("Positioning cube {} at {}", i, fmt_3(pos));
-                    unsafe { dGeomSetPosition(self.geoms[i].0, pos[0], pos[1], pos[2]); }
+                    self.create_cube(mass, Vec3::new(pos[0], pos[1], pos[2]));
                 }
                 unsafe {
-                    // println!("rotating cube {} to {}", i, fmt_12(rot));
+                    dGeomSetPosition(self.geoms[i].0, pos[0], pos[1], pos[2]);
                     dGeomSetRotation(self.geoms[i].0, &rot);
                 }
             }
         }
-        println!("Number of geoms={}", self.geoms.len());
     }
 
     pub fn toggle_pause(&mut self) {

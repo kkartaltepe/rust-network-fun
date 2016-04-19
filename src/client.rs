@@ -18,10 +18,10 @@ fn main() {
     let socket = UdpSocket::bind("127.0.0.1:35556").unwrap();
 
     let mut buf = [0; 9000];
-    let _ = socket.send_to(&buf, "127.0.0.1:35555").unwrap();
-    let (amt, _) = socket.recv_from(&mut buf).unwrap(); // Get the Hello back
     println!("Connecting to server.");
-    println!("Recieved {} bytes hello from server.", amt);
+    let _ = socket.send_to(&buf, "127.0.0.1:35555").unwrap();
+    //let (amt, _) = socket.recv_from(&mut buf).unwrap(); // Get the Hello back
+    //println!("Recieved {} bytes hello from server.", amt);
     //println!("Sent {}/{}[{}%] bytes", sent, buf.len(), (sent/buf.len()) as u32);
 
     //Init everything
@@ -34,11 +34,9 @@ fn main() {
     let mut should_close = false;
 
     while !should_close {
-        let _ = socket.recv_from(&mut buf).unwrap(); // Get the Hello back
+        let _ = socket.recv_from(&mut buf).unwrap(); // Get the state from the server
         simulation.deserialize(&buf);
-        println!("Finished deserializing data from the server");
         simulation.step();
-        println!("Finished simulation step");
 
         unsafe { // Opengl calls are unsafe
             gl::Enable(gl::DEPTH_TEST);

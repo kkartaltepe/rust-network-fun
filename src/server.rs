@@ -41,9 +41,6 @@ fn main() {
     print!("Starting server . . . ");
     let socket = UdpSocket::bind("127.0.0.1:35555").unwrap();
     let mut buf = [0; 9000];
-    println!("Waiting on client.");
-    let (_, client) = socket.recv_from(&mut buf).unwrap(); //Receive into the buffer
-    println!("Client connected from {}.", client);
 
     //Init everything
     let mut graphix = Renderer::init("Server Window");
@@ -51,17 +48,20 @@ fn main() {
 
     simulation.create_cube(10.0, Vec3::new(0.0, 1.0, 0.0));
     for n in 0..100 {
-        simulation.create_cube(1.0, Vec3::new(((n/10)*2) as f32, 3.0, ((n%10)*2) as f32));
+        simulation.create_cube(0.1, Vec3::new(((n/10)*2) as f32, 3.0, ((n%10)*2) as f32));
     }
-    print!("Done.\n");
+
+    println!("Waiting on client.");
+    let (_, client) = socket.recv_from(&mut buf).unwrap(); //Receive into the buffer
+    println!("Client connected from {}.", client);
 
     // Do Simulation and rendering
     println!("Beginning simulation");
-    let mut bytes_sent = 0u64;
+    let mut bytes_sent = socket.send_to(&simulation.serialize(true), client).unwrap() as u64; // Init packet to prevent blank client
     let mut last_second = PreciseTime::now();
     let mut should_close = false;
     while !should_close {
-        bytes_sent += socket.send_to(&simulation.serialize(), client).unwrap() as u64;
+        bytes_sent += socket.send_to(&simulation.serialize(false), client).unwrap() as u64;
         let now = PreciseTime::now();
         let differential = last_second.to(now);
         if differential > Duration::seconds(1) {
@@ -107,6 +107,11 @@ fn handle_window_event(event: glutin::Event, simulation: &mut Simulation, should
         }
         Event::KeyboardInput(KeyState::Pressed, _, Some(Key::P)) => {
             simulation.toggle_pause();
+        }
+        Event::KeyboardInput(KeyState::Pressed, _, Some(Key::Space)) => {
+            let lev_force = 250f32;
+            let pos = simulation.get_location(simulation.geoms[0].0);
+            simulation.apply_force(simulation.geoms[0].0, Vec3::new(0.0, (lev_force-(pos.z * 5.0).powf(3.0)).min(0.0), 0.0));
         }
         Event::KeyboardInput(KeyState::Pressed, _, Some(Key::Up)) => {
             simulation.apply_force(simulation.geoms[0].0, Vec3::new(0.0, 0.0, push_force));
